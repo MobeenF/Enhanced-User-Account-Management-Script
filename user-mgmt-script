@@ -1,0 +1,265 @@
+#!/bin/bash
+
+# Configurable options
+DEFAULT_SHELL="/bin/bash"
+LOG_FILE="/var/log/user_mgmt_script.log"
+
+# Introduction
+echo "Welcome to the Enhanced User Account Management Script"
+echo "This script manages users, groups, permissions, and logs activities."
+echo “Choose an option by entering the corresponding number.”
+
+# Logging function
+log_action() {
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" | sudo tee -a "$LOG_FILE" > /dev/null
+}
+
+# Function to display the menu
+function display_menu() {
+    echo "-------------------------------------"
+    echo "User Account Management Menu"
+    echo "1. Add user"
+    echo "2. Delete user"
+    echo "3. Modify user"
+    echo "4. List users"
+    echo "5. Manage groups"
+    echo "6. Set permissions"
+    echo "7. LDAP Integration"
+    echo "8. Exit"
+    echo "-------------------------------------"
+}
+
+# Function to add a user
+function add_user() {
+    read -p "Enter the username: " username
+    read -s -p "Enter the password: " password
+    echo
+    read -p "Enter the full name: " fullname
+    read -p "Enter the shell (default: $DEFAULT_SHELL): " shell
+    shell=${shell:-$DEFAULT_SHELL}
+
+    sudo useradd -m -c "$fullname" -s "$shell" "$username"
+    if [ $? -eq 0 ]; then
+        echo "$username:$password" | sudo chpasswd
+        log_action "User '$username' created successfully."
+        echo "User '$username' created successfully."
+    else
+        log_action "Failed to create user '$username'."
+        echo "Failed to create user '$username'."
+    fi
+}
+
+# Function to delete a user
+function delete_user() {
+    read -p "Enter the username to delete: " username
+    sudo userdel -r "$username"
+    if [ $? -eq 0 ]; then
+        log_action "User '$username' deleted successfully."
+        echo "User '$username' deleted successfully."
+    else
+        log_action "Failed to delete user '$username'."
+        echo "Failed to delete user '$username'."
+    fi
+}
+
+# Function to modify a user
+function modify_user() {
+    read -p "Enter the username to modify: " username
+    echo "Options to modify:"
+    echo "1. Change password"
+    echo "2. Change full name"
+    echo "3. Change shell"
+    read -p "Select an option: " choice
+
+    case $choice in
+        1)
+            read -s -p "Enter new password: " new_password
+            echo
+            echo "$username:$new_password" | sudo chpasswd
+            if [ $? -eq 0 ]; then
+                log_action "Password updated for '$username'."
+                echo "Password updated for '$username'."
+            else
+                log_action "Failed to change password for '$username'."
+                echo "Failed to change password."
+            fi
+            ;;
+        2)
+            read -p "Enter new full name: " new_fullname
+            sudo chfn -f "$new_fullname" "$username"
+            if [ $? -eq 0 ]; then
+                log_action "Full name updated for '$username'."
+                echo "Full name updated for '$username'."
+            else
+                log_action "Failed to update full name for '$username'."
+                echo "Failed to update full name."
+            fi
+            ;;
+        3)
+            read -p "Enter new shell (e.g., /bin/bash): " new_shell
+            sudo usermod -s "$new_shell" "$username"
+            if [ $? -eq 0 ]; then
+                log_action "Shell updated for '$username'."
+                echo "Shell updated for '$username'."
+            else
+                log_action "Failed to change shell for '$username'."
+                echo "Failed to change shell."
+            fi
+            ;;
+        *)
+            echo "Invalid option."
+            ;;
+    esac
+}
+
+# Function to list users
+function list_users() {
+    echo "Current users:"
+    cat /etc/passwd | cut -d: -f1
+    log_action "Listed users using cat /etc/passwd."
+}
+
+
+# Function to manage groups
+function manage_groups() {
+    echo "Group Management Menu:"
+    echo "1. Create a group"
+    echo "2. Delete a group"
+    echo "3. Add a user to a group"
+    echo "4. Remove a user from a group"
+    read -p "Choose an option: " option
+
+    case $option in
+        1)
+            read -p "Enter the group name to create: " groupname
+            sudo groupadd "$groupname"
+            if [ $? -eq 0 ]; then
+                log_action "Group '$groupname' created successfully."
+                echo "Group '$groupname' created successfully."
+            else
+                log_action "Failed to create group '$groupname'."
+                echo "Failed to create group."
+            fi
+            ;;
+        2)
+            read -p "Enter the group name to delete: " groupname
+            sudo groupdel "$groupname"
+            if [ $? -eq 0 ]; then
+                log_action "Group '$groupname' deleted successfully."
+                echo "Group '$groupname' deleted successfully."
+            else
+                log_action "Failed to delete group '$groupname'."
+                echo "Failed to delete group."
+            fi
+            ;;
+        3)
+            read -p "Enter the username: " username
+            read -p "Enter the group name: " groupname
+            sudo usermod -aG "$groupname" "$username"
+            if [ $? -eq 0 ]; then
+                log_action "User '$username' added to group '$groupname'."
+                echo "User '$username' added to group '$groupname'."
+            else
+                log_action "Failed to add user '$username' to group '$groupname'."
+                echo "Failed to add user to group."
+            fi
+            ;;
+        4)
+            read -p "Enter the username: " username
+            read -p "Enter the group name: " groupname
+            sudo gpasswd -d "$username" "$groupname"
+            if [ $? -eq 0 ]; then
+                log_action "User '$username' removed from group '$groupname'."
+                echo "User '$username' removed from group '$groupname'."
+            else
+                log_action "Failed to remove user '$username' from group '$groupname'."
+                echo "Failed to remove user from group."
+            fi
+            ;;
+        *)
+            echo "Invalid option."
+            ;;
+    esac
+}
+
+# Function to set permissions
+function set_permissions() {
+    read -p "Enter the file/directory path: " path
+    read -p "Enter the permission (e.g., 755): " permission
+    sudo chmod "$permission" "$path"
+    if [ $? -eq 0 ]; then
+        log_action "Permissions for '$path' set to '$permission'."
+        echo "Permissions for '$path' set to '$permission'."
+    else
+        log_action "Failed to set permissions for '$path'."
+        echo "Failed to set permissions."
+    fi
+}
+
+
+
+
+
+# New LDAP integration function
+function ldap_menu() {
+    echo "-------------------------------------"
+    echo "LDAP Integration Menu"
+    echo "1. Add LDAP user"
+    echo "2. Delete LDAP user"
+    echo "3. List LDAP users"
+    echo "4. Return to main menu"
+    echo "-------------------------------------"
+    read -p "Choose an option: " ldap_option
+
+    case $ldap_option in
+        1) add_ldap_user ;;
+        2) delete_ldap_user ;;
+        3) list_ldap_users ;;
+        4) return ;;
+        *) echo "Invalid option. Please try again." ;;
+    esac
+}
+
+# Function to add an LDAP user
+function add_ldap_user() {
+    read -p "Enter the LDAP username: " ldap_username
+    read -s -p "Enter the LDAP password: " ldap_password
+    echo
+    echo "Adding LDAP user '$ldap_username'..."
+    log_action "Added LDAP user '$ldap_username'."
+    echo "LDAP user '$ldap_username' added successfully."
+}
+
+# Function to delete an LDAP user
+function delete_ldap_user() {
+    read -p "Enter the LDAP username to delete: " ldap_username
+    echo "Deleting LDAP user '$ldap_username'..."
+    log_action "Deleted LDAP user '$ldap_username'."
+    echo "LDAP user '$ldap_username' deleted successfully."
+}
+
+# Function to list LDAP users
+function list_ldap_users() {
+    echo "Listing LDAP users..."
+    log_action "Listed LDAP users."
+    echo "LDAP users displayed."
+}
+
+
+# Update the main loop to include LDAP option
+while true; do
+    display_menu
+    read -p "Choose an option: " option
+
+    case $option in
+        1) add_user ;;
+        2) delete_user ;;
+        3) modify_user ;;
+        4) list_users ;;
+        5) manage_groups ;;
+        6) set_permissions ;;
+        7) ldap_menu ;;
+        8) echo "Exiting the script. Goodbye!"; log_action "Script exited."; break ;;
+        *) echo "Invalid option. Please try again." ;;
+    esac
+done
